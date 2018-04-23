@@ -7,10 +7,16 @@ a simple js program to explain how blockchain works
 这个项目是js来实现一个区块链系统。受[Building Blockchain in Go](https://jeiwan.cc/posts/building-blockchain-in-go-part-1/) 该文章启发，同时，将该作者的文章翻译并且加入自己的js代码重新编排。感谢该作者。
 
  * [基本原型](https://github.com/jasoncodingnow/blockchain_js/blob/part1/basic_prototype_cn.md)
+ 
+ ## 说明 ##
+
+ 该项目使用的是es6的语法，考虑到js应该是最容易看懂的语言，以及es6目前发展状况非常良好。因此，采用es6的语法来编写该项目。 
 
  ## 环境 environment ##
 
-  * node 7.0 以上版本
+  * node 7.0 以上版本 
+
+ ## 运行 ## 
   * git clone https://github.com/jasoncodingnow/blockchain_js.git
   * cd blockchain_js
   * npm install
