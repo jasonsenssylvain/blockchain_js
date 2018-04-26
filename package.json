@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/jasoncodingnow/blockchain_js#readme",
   "dependencies": {
+    "bigi": "^1.4.2",
+    "bignumber.js": "^6.0.0",
     "jshashes": "^1.0.7",
     "mocha": "^5.1.1"
   }
