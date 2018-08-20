@@ -32,6 +32,7 @@ JavaScript is basically a language any programmer can understand. Es6 can help p
 
  * [基本原型](https://github.com/jasoncodingnow/blockchain_js/blob/part1/basic_prototype_cn.md)
  * [工作量证明](https://github.com/jasoncodingnow/blockchain_js/blob/part2/pws.md)
+ * [持久化和命令行接口](https://github.com/jasoncodingnow/blockchain_js/blob/part3/persistence-and-cli.md)
  
  ## 说明 ##
 
