@@ -203,3 +203,120 @@ class BlockChainIterator {
 通过BlockChain里面的方法获取到Iterator实例，可以调用 ```curr()``` 以及 ```prevBlock()``` 获取对应的block。注意，迭代器的初始状态为链中的 tip，因此区块将从尾到头（创世块为头），也就是从最新的到最旧的进行获取。实际上，**选择一个 tip 就是意味着给一条链“投票”**。一条链可能有多个分支，最长的那条链会被认为是主分支。在获得一个 tip （可以是链中的任意一个块）之后，我们就可以重新构造整条链，找到它的长度和需要构建它的工作。这同样也意味着，一个 tip 也就是区块链的一种标识符。
 
 这就是数据库部分的内容了！
+
+
+## CLI
+
+到目前为止，我们的实现还没有提供一个与程序交互的接口：目前只是简单执行了 `NewBlockchain` 和 `bc.AddBlock` 。是时候改变了！现在我们想要拥有这些命令：
+``` JavaScript
+  // cd to current project folder
+  node src/cli.js --addblock "Pay 0.031337 for a coffee"
+  node src/cli.js --printchain
+```
+
+所有的命令行相关的操作都会通过 cli.js 来进行处理。
+
+# commander
+详情可见 **[这里](https://github.com/tj/commander.js):nodejs命令行工具)**。
+
+# 代码部分
+```JavaScript
+
+const program     = require('commander');
+
+const Block       = require("./block.js");
+const BlockChain  = require("./blockchain.js");
+
+program
+  .version('0.1.0')
+  .option('-a, --addblock', 'Default empty',)
+  .option('-p, --printchain')
+  .parse(process.argv);
+
+
+
+let addblock = program.addblock;
+console.log(`addBlock: ${addblock}`);
+if (addblock && addblock != '') {
+  let bc = BlockChain.NewBlockChain();
+  bc.addBlock(addblock);
+
+  let iterator = bc.getBlockIterator();
+  let currBlock = iterator.curr();
+  console.log(currBlock);
+}
+
+let printchain = program.printchain; 
+console.log(`printchain: ${printchain}`);
+if (printchain && printchain != '') {
+  let bc = BlockChain.NewBlockChain();
+  let iterator = bc.getBlockIterator();
+  let currBlock = iterator.curr();
+  console.log(currBlock);
+  while(iterator.hasNext()) {
+    let prev = iterator.next();
+    console.log(prev);
+  }
+}
+
+
+```
+
+我们用 ```commander```来对命令行参数进行解析。首先，我们创建了两个命令 ```addblock``` 和 ```printchain```。对于 ```addblock```，需要传递参数，作为block的data。而对于 ```printchain```，只验证该参数是否传递，如果传递，则打印整个blockchain。
+
+其中，```printchain``` 部分代码，就是利用了Iterator迭代器对blockchain的block进行遍历，最终一个一个打印出来。
+
+尝试运行下前文提及的两个命令。
+
+```Shell
+
+## input addblock "Pay 0.031337 for a coffee"
+
+node src/cli.js --addblock "Pay 0.031337 for a coffee"
+
+addBlock: Pay 0.031337 for a coffee
+Mining the block: Pay 0.031337 for a coffee
+Mining end! hash: 00d29174de8232af298c07a867eff2bfd538ae8b3cb104c737f1bcb1d9bacb69
+Block {
+  timestamp: 1534753677791,
+  data: 'Pay 0.031337 for a coffee',
+  prevBlockHash: '0007b433932931ee20d1cd8bd1d99f682ce453d374f08b726f2fcc96e6b5d7d9',
+  hash: '00d29174de8232af298c07a867eff2bfd538ae8b3cb104c737f1bcb1d9bacb69',
+  nonce: 0 }
+printchain: undefined
+
+
+
+## input printchain
+
+node src/cli.js --printchain
+
+addBlock: undefined
+printchain: true
+Block {
+  timestamp: 1534754549174,
+  data: true,
+  prevBlockHash: '007e0c70cd625bb198db22d2dab5ab7716502f0d48382bf77f89ec3b1f9f4b99',
+  hash: '009d9ab8ba29c24cfa0307729f33595951073e304ae0860a7cd87080c7a160b6',
+  nonce: 0 }
+Block {
+  timestamp: 1534754514339,
+  data: 'Send 1 BTC to another friend',
+  prevBlockHash: '0032cd95416119244dc37fa0013b2a6e85252566718fbae447de338e45ccc7bf',
+  hash: '007e0c70cd625bb198db22d2dab5ab7716502f0d48382bf77f89ec3b1f9f4b99',
+  nonce: 0 }
+Block {
+  timestamp: 1534754514310,
+  data: 'Send 1 BTC to a friend',
+  prevBlockHash: '0032953c8509cbe60b3d8f0fbbd5cece6de63247e336e85fbeee95d15e14b206',
+  hash: '0032cd95416119244dc37fa0013b2a6e85252566718fbae447de338e45ccc7bf',
+  nonce: 0 }
+Block {
+  timestamp: 1534754490482,
+  data: 'Genesis Block',
+  prevBlockHash: '',
+  hash: '0032953c8509cbe60b3d8f0fbbd5cece6de63247e336e85fbeee95d15e14b206',
+  nonce: 0 }
+
+  
+```
