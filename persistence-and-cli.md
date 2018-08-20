@@ -216,10 +216,10 @@ class BlockChainIterator {
 
 所有的命令行相关的操作都会通过 cli.js 来进行处理。
 
-# commander
+### commander
 详情可见 **[这里](https://github.com/tj/commander.js):nodejs命令行工具)**。
 
-# 代码部分
+### 代码部分
 ```JavaScript
 
 const program     = require('commander');
