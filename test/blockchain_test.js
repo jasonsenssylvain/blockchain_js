@@ -11,6 +11,19 @@ describe('BlockChain', function () {
       bc.addBlock(`Send 1 BTC to another friend`);
 
       console.log(bc);
+
+      let iterator = bc.getBlockIterator();
+      let currBlock = iterator.curr();
+      console.log(currBlock);
+
+      let prevBlock = iterator.prevBlock();
+      console.log(prevBlock);
+
+      prevBlock = iterator.prevBlock();
+      console.log(prevBlock);
+
+      prevBlock = iterator.prevBlock();
+      console.log(prevBlock);
     });
   });
 });

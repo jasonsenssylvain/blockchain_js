@@ -19,7 +19,9 @@
   "dependencies": {
     "bigi": "^1.4.2",
     "bignumber.js": "^6.0.0",
+    "incache": "^7.0.5",
     "jshashes": "^1.0.7",
-    "mocha": "^5.1.1"
+    "mocha": "^5.1.1",
+    "trivialdb": "^3.0.0-rc.2"
   }
 }

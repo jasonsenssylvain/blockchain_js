@@ -27,6 +27,18 @@ class Block {
   //   let hash = "" + this.prevBlockHash + this.data + this.timestamp;
   //   this.hash = new Hashes.SHA256().hex(hash);
   // }
+
+  toString() {
+    return JSON.stringify(
+      this
+    );
+  }
+
+  static fromString(data) {
+    let payload = JSON.parse(data);
+    let block = new Block(payload.timestamp, payload.data, payload.prevBlockHash, payload.hash, payload.nonce);
+    return block;
+  }
 }
 
 module.exports = Block;
