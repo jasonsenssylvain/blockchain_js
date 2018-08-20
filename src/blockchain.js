@@ -12,7 +12,7 @@ class BlockChain {
     });
 
     let bc;
-    
+
     // check db
     let lastHash = store.get('l');
     if (!lastHash) {
@@ -47,6 +47,7 @@ class BlockChain {
     let lastHash = this.tip;
     let newBlock = Block.NewBlock(data, lastHash);
     this.db.set(newBlock.hash, newBlock.toString());
+    this.db.set('l', newBlock.hash);
     this.tip = newBlock.hash;
   }
 
@@ -68,16 +69,23 @@ class BlockChainIterator {
   curr() {
     let data = this.blockchain.db.get(this.tip);
     let block = Block.fromString(data);
-    this.tip = block.hash;
     return block;
   }
 
-  prevBlock() {
+  next() {
     let block = this.curr();
     this.tip = block.prevBlockHash;
-    if (!this.tip)
+    if (!this.tip || this.tip == '')
       return null;
     return this.curr();
+  }
+
+  hasNext() {
+    let block = this.curr();
+    let prevBlockHash = block.prevBlockHash;
+    if (!prevBlockHash || prevBlockHash == '')
+      return false;
+    return true;
   }
 }
 

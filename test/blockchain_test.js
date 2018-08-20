@@ -15,15 +15,10 @@ describe('BlockChain', function () {
       let iterator = bc.getBlockIterator();
       let currBlock = iterator.curr();
       console.log(currBlock);
-
-      let prevBlock = iterator.prevBlock();
-      console.log(prevBlock);
-
-      prevBlock = iterator.prevBlock();
-      console.log(prevBlock);
-
-      prevBlock = iterator.prevBlock();
-      console.log(prevBlock);
+      while(iterator.hasNext()) {
+        let prev = iterator.next();
+        console.log(prev);
+      }
     });
   });
 });
