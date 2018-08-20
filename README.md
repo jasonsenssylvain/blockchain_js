@@ -6,8 +6,9 @@ a simple js program to explain how blockchain works
 
 this tiny blockchain project is built using JavaScript, inspired by [Building Blockchain in Go](https://jeiwan.cc/posts/building-blockchain-in-go-part-1/). Translate it to JavaScript version and translate these articles to Chinese. 
 
- * [basic prototype Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part1/basic_prototype_cn.md)
+ * [Basic prototype Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part1/basic_prototype_cn.md)
  * [Proof Of Work Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part2/pws.md)
+ * [Persistence and Cli Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part3/persistence-and-cli.md)
  
 ## Why use es6 ##
 
