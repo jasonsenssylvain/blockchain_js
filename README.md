@@ -9,7 +9,8 @@ this tiny blockchain project is built using JavaScript, inspired by [Building Bl
  * [Basic prototype Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part1/basic_prototype_cn.md)
  * [Proof Of Work Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part2/pws.md)
  * [Persistence and Cli Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part3/persistence-and-cli.md)
- 
+ * [Transaction Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part4/transaction-1.md) 
+
 ## Why use es6 ##
 
 JavaScript is basically a language any programmer can understand. Es6 can help programmer jump out of callback hell. For me it's a big step for JavaScript.
