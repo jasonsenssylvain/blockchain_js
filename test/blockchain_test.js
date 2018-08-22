@@ -13,8 +13,6 @@ describe('BlockChain', function () {
       console.log(bc);
 
       let iterator = bc.getBlockIterator();
-      let currBlock = iterator.curr();
-      console.log(currBlock);
       while(iterator.hasNext()) {
         let prev = iterator.next();
         console.log(prev);

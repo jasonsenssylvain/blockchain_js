@@ -16,7 +16,7 @@ class POW {
 
   prepareData(nonce) {
     return this.block.prevBlockHash + "" 
-    + this.block.data + "" 
+    + this.block.hashTransaction() + "" 
     + this.block.timestamp + "" 
     + POW.trgetBits + "" 
     + nonce;
@@ -28,7 +28,7 @@ class POW {
 
     let nonce = 0;
     let sha256 = new Hashes.SHA256();
-    console.log(`Mining the block: ${this.block.data}`);
+    console.log(`Mining the block: ${this.block.transactions}`);
 
     while(nonce < POW.maxNonce) {
       let data = this.prepareData(nonce);
