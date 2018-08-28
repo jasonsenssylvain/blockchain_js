@@ -12,6 +12,7 @@ class Transaction {
 
   static TxsFromString(data) {
     if (typeof data == 'string') {
+      console.log("data", data);
       data = JSON.parse(data);
     }
 

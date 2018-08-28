@@ -20,9 +20,13 @@
     "bigi": "^1.4.2",
     "bignumber.js": "^6.0.0",
     "commander": "^2.17.1",
+    "cryptojstool": "^1.0.8",
+    "elliptic": "^6.4.1",
     "incache": "^7.0.5",
     "jshashes": "^1.0.7",
     "mocha": "^5.1.1",
+    "secp256k1": "^3.5.2",
+    "secure-random": "^1.1.1",
     "trivialdb": "^3.0.0-rc.2"
   }
 }
