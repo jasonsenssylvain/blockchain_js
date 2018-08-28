@@ -7,8 +7,6 @@ describe('BlockChain', function () {
   describe('#NewBlockChain()', function () {
     it('should create a new block', function () {
       let bc = BlockChain.NewBlockChain();
-      bc.addBlock(`Send 1 BTC to a friend`);
-      bc.addBlock(`Send 1 BTC to another friend`);
 
       console.log(bc);
 
