@@ -63,12 +63,47 @@ class BlockChain {
     return new BlockChainIterator(this);
   }
 
-  findUnspentTransactions(address) {
+  // 根据id，依次查询所有block里面的transaction
+  findTransaction(id) {
+    let iterator = this.getBlockIterator();
+    while(iterator.hasNext()) {
+      let prev = iterator.next();
+      for (let i in prev.transactions) {
+        let tx = prev.transactions[i];
+        if (tx.id === id) {
+          return tx;
+        }
+      }
+    }
+    return null;
+  }
+
+  signTransaction(transaction, walletPrivateKey) {
+    let prevTXs = {};
+    for (let i in transaction.vIn) {
+      let prevTX = this.findTransaction(transaction.vIn[i].txId);
+      prevTXs[prevTX.id] = prevTX;
+    }
+    transaction.sign(walletPrivateKey, prevTXs);
+  }
+
+  verifyTransaction(transaction) {
+    let prevTXs = {};
+    for (let i in transaction.vIn) {
+      let prevTX = this.findTransaction(transaction.vIn[i].txId);
+      prevTXs[prevTX.id] = prevTX;
+    }
+    return transaction.verify(prevTXs);
+  }
+
+  // in PART5: change address to pubKeyHash
+  findUnspentTransactions(pubKeyHash) {
     let unspentTXs = [];
 
     let spentTXOs = {};
 
     let iterator = this.getBlockIterator();
+
     while(iterator.hasNext()) {
       let block = iterator.next();
 
@@ -96,7 +131,8 @@ class BlockChain {
           }
 
           let out = tx.vOut[outIdx];
-          if (out.canBeUnlockedWith(address)) {
+          // change in PART5
+          if (out.isLockedWithKey(pubKeyHash)) {
             unspentTXs.push(tx);
           }
         }
@@ -104,7 +140,8 @@ class BlockChain {
         if (tx.isCoinbase() == false) {
           for (let k = 0; k < tx.vIn.length; k ++) {
             let vIn = tx.vIn[k];
-            if (vIn.canUnlockOutputWith(address)) {
+            // change in PART5
+            if (vIn.usersKey(pubKeyHash)) {
               let vInId = vIn.txId;
               if (!spentTXOs[vInId]) {
                 spentTXOs[vInId] = [];
@@ -119,13 +156,14 @@ class BlockChain {
     return unspentTXs;
   }
 
-  findUTXO(address) {
+  // change IN PART5
+  findUTXO(pubKeyHash) {
     let UTXOs = [];
-    let txs = this.findUnspentTransactions(address);
+    let txs = this.findUnspentTransactions(pubKeyHash);
 
     for (let i = 0; i < txs.length; i ++) {
       for (let j = 0; j < txs[i].vOut.length; j ++) {
-        if (txs[i].vOut[j].canBeUnlockedWith(address)) {
+        if (txs[i].vOut[j].isLockedWithKey(pubKeyHash)) {
           UTXOs.push(txs[i].vOut[j]);
         }
       }
@@ -133,19 +171,21 @@ class BlockChain {
     return UTXOs;
   }
 
-  findSpendableOutputs(address, amount) {
+  findSpendableOutputs(pubKeyHash, amount) {
     let unspentOutputs = {};
-    let unspentTxs = this.findUnspentTransactions(address);
+    let unspentTxs = this.findUnspentTransactions(pubKeyHash);
     let accumulated = 0;
 
     for (let key in unspentTxs) {
       let tx = unspentTxs[key];
+
+      // 最终，unspentOutputs的id是 tx.id
       let txId = tx.id;
 
       let needBreak = false;
       for (let outIdx = 0; outIdx < tx.vOut.length; outIdx ++) {
         let output = tx.vOut[outIdx];
-        if (output.canBeUnlockedWith(address) && accumulated < amount) {
+        if (output.isLockedWithKey(pubKeyHash) && accumulated < amount) {
           accumulated += output.value;
           if (!unspentOutputs[txId]) 
             unspentOutputs[txId] = [];
@@ -167,7 +207,15 @@ class BlockChain {
     };
   }
 
+  // 每个transaction都必须经过验证
   mineBlock(txs) {
+    for (let i in txs) {
+      let tx = txs[i];
+      if (!this.verifyTransaction(tx)) {
+        throw new Error('transaction verify failed');
+      }
+    }
+
     let lastHash = this.db.get('l');
     let newBlock = Block.NewBlock(txs, lastHash);
     this.db.set(newBlock.hash, newBlock.toString());

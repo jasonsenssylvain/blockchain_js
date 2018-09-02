@@ -10,6 +10,7 @@ this tiny blockchain project is built using JavaScript, inspired by [Building Bl
  * [Proof Of Work Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part2/pws.md)
  * [Persistence and Cli Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part3/persistence-and-cli.md)
  * [Transaction Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part4/transaction-1.md) 
+ * [Address Chinese](https://github.com/jasoncodingnow/blockchain_js/blob/part5/address.md) 
 
 ## Why use es6 ##
 
@@ -36,6 +37,7 @@ JavaScript is basically a language any programmer can understand. Es6 can help p
  * [工作量证明](https://github.com/jasoncodingnow/blockchain_js/blob/part2/pws.md)
  * [持久化和命令行接口](https://github.com/jasoncodingnow/blockchain_js/blob/part3/persistence-and-cli.md)
  * [交易](https://github.com/jasoncodingnow/blockchain_js/blob/part4/transaction-1.md)
+ * [地址](https://github.com/jasoncodingnow/blockchain_js/blob/part5/address.md) 
  
  ## 说明 ##
 

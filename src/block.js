@@ -1,7 +1,7 @@
 const Hashes    = require('jshashes');
 
 const POW       = require('./pow.js')
-const {Transaction} = require('./transaction.js');
+const Transaction = require('./transaction.js').Transaction;
 
 class Block {
 
@@ -29,9 +29,24 @@ class Block {
   //   this.hash = new Hashes.SHA256().hex(hash);
   // }
 
+  toJSON() {
+    let obj = {};
+    obj.timestamp = this.timestamp;
+    obj.prevBlockHash = this.prevBlockHash;
+    obj.hash = this.hash;
+    obj.nonce = this.nonce;
+
+    let txs = [];
+    for (let i in this.transactions) {
+      txs.push(this.transactions[i].toJSON());
+    }
+    obj.transactions = txs;
+    return obj;
+  }
+
   toString() {
     return JSON.stringify(
-      this
+      this.toJSON()
     );
   }
 
@@ -44,14 +59,7 @@ class Block {
   }
 
   hashTransaction() {
-    let txHashes = "";
-    for (let i = 0; i < this.transactions.length; i++) {
-      txHashes += JSON.stringify(this.transactions[i]);
-    }
-
-    let sha256 = new Hashes.SHA256();
-    let hash = sha256.hex(txHashes);
-    return hash;
+    return Transaction.hashTransaction(this.transactions);
   }
 }
 

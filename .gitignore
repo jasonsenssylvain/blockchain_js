@@ -65,3 +65,5 @@ package-lock.json
 .incache
 
 .DS_Store
+
+test.test.js

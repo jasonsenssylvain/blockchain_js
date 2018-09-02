@@ -1,8 +1,10 @@
 const program     = require('commander');
+const Base58Check     = require('cryptojstool').Base58Check;
 
 const Block       = require("./block.js");
 const BlockChain  = require("./blockchain.js");
-const {Transaction} = require('./transaction.js');
+const Transaction = require('./transaction.js').Transaction;
+const Wallets     = require('./wallet.js').Wallets;
 
 program
   .version('0.1.0')
@@ -19,11 +21,9 @@ program
     let bc = BlockChain.NewBlockChain(addr);
 
     let iterator = bc.getBlockIterator();
-    let currBlock = iterator.curr();
-    console.log(currBlock);
     while(iterator.hasNext()) {
       let prev = iterator.next();
-      console.log(prev);
+      console.log(prev.toString());
     }
   });
 
@@ -35,7 +35,8 @@ program
     var addr = options.address || "";
     let bc = BlockChain.NewBlockChain(addr);
 
-    let UTXOs = bc.findUTXO(addr);
+    let pubkeyHash = Base58Check.decode(addr, Wallets.getDefaultVersioin().public);
+    let UTXOs = bc.findUTXO(pubkeyHash);
     let amount = 0;
     for (let i = 0; i < UTXOs.length; i ++) {
       amount += UTXOs[i].value;
@@ -62,12 +63,23 @@ program
     console.log(`Success!`);
   });
 
+  program
+  .command('createwallet')
+  .description('createwallet')
+  .action(function(options){
+    let wallets = Wallets.newWallets();
+    let newAddress = wallets.createWallet();
+    wallets.save();
+
+    console.log(`Your new address: ${newAddress}`);
+  });
+
 program.parse(process.argv);
 
 
 let addblock = program.addblock;
-console.log(`addBlock: ${addblock}`);
 if (addblock && addblock != '') {
+  console.log(`addBlock: ${addblock}`);
   let bc = BlockChain.NewBlockChain();
   bc.addBlock(addblock);
 
@@ -77,8 +89,8 @@ if (addblock && addblock != '') {
 }
 
 let printchain = program.printchain; 
-console.log(`printchain: ${printchain}`);
 if (printchain && printchain != '') {
+  console.log(`printchain: ${printchain}`);
   let bc = BlockChain.NewBlockChain();
   let iterator = bc.getBlockIterator();
   while(iterator.hasNext()) {

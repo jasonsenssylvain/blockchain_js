@@ -107,3 +107,549 @@ Version  Public key hash                           Checksum
 由于哈希函数是单向的（也就说无法逆转回去），所以不可能从一个哈希中提取公钥。不过通过执行哈希函数并进行哈希比较，我们可以检查一个公钥是否被用于哈希的生成。
 
 好了，所有细节都已就绪，来写代码吧。很多概念只有当写代码的时候，才能理解地更透彻。
+
+## 相关代码
+
+[基础库](https://github.com/jasoncodingnow/cryptojstool)
+
+该基础库实现了几个算法：
+
+1. base58Check，base58相关算法
+2. eckey，基础的椭圆加密公钥私钥算法
+3. coinkey，bitcoin的相关地址算法
+
+因此，我们对于具体底层算法细节暂时不做太多推论。
+
+## 实现地址
+
+我们先从钱包 `Wallet` 结构开始：
+
+```JavaScript
+
+  //wallet.js
+
+  constructor(privateKey) {
+    if (privateKey)
+      this.coinkey = new CoinKey(Buffer.from(privateKey, 'hex'), versions);
+  }
+
+  get address() {
+    return this.coinkey.publicAddress;
+  }
+
+  get pubKeyHash() {
+    return this.coinkey.pubKeyHash;
+  }
+
+  get publicKey() {
+    return this.coinkey.publicKey;
+  }
+
+  get privateKey() {
+    return this.coinkey.privateKey;
+  }
+
+  toString() {
+    return {
+      address: this.address,
+      privateWif: this.coinkey.privateWif
+    };
+  }
+
+  static newWallet() {
+    let coinkey = CoinKey.createRandom(DEFAULT_VERSIONS);
+    let wallet = new Wallet();
+    wallet.coinkey = coinkey;
+    return wallet;
+  }
+
+  static newWalletFromPrivateWif(privateWif) {
+    let coinkey = CoinKey.fromWif(privateWif, DEFAULT_VERSIONS);
+    let wallet = new Wallet();
+    wallet.coinkey = coinkey;
+    return wallet;
+  }
+
+  static checksum(payloadBuf) {
+    let checksum = Base58Check.sha256x2(payloadBuf).slice(0, 4);
+    return checksum;
+  }
+
+  static validAddress(address) {
+    return Base58Check.isValid(address);
+  }
+```
+
+wallet实际上是对coinkey的一次包装，具体可以查看其源码。其底层可以生成bitcoind的```publicKey```，```pubKeyHash```，```privateKey```等。
+
+一个钱包只有一个密钥对而已。我们需要 `Wallets` 类型来保存多个钱包的组合，将它们保存到文件中，或者从文件中进行加载。`Wallet` 的构造函数会生成一个新的密钥对。ECDSA 基于椭圆曲线，所以我们需要一个椭圆曲线。接下来，使用椭圆生成一个私钥，然后再从私钥生成一个公钥。有一点需要注意：在基于椭圆曲线的算法中，公钥是曲线上的点。因此，公钥是 X，Y 坐标的组合。在比特币中，这些坐标会被连接起来，然后形成一个公钥。
+
+Wallets的具体代码如下：
+
+```JavaScript
+
+class Wallets {
+  constructor() {
+    this.wallets = {};  // key: address, value: wallet
+    let store = new InCache({
+      storeName: "wallets",
+      autoSave: true,
+      autoSaveMode: "timer",
+      autoSavePeriod: "2"
+    });
+    this.store = store;
+  }
+
+  static getDefaultVersioin() {
+    return DEFAULT_VERSIONS;
+  }
+
+  // load from files if exists
+  static newWallets() {
+    let wallets = new Wallets();
+    let data = wallets.store.get("wallets");  // wallets as default wallet name
+    if (data) {
+      data = JSON.parse(data);
+
+      for (let addr in data) {
+        let w = data[addr];
+        let privateWif = w.privateWif;
+        let wallet = Wallet.newWalletFromPrivateWif(privateWif);
+        wallets.wallets[addr] = wallet;
+      }
+    }
+
+    return wallets;
+  }
+
+  createWallet() {
+    let wallet = Wallet.newWallet();
+    this.wallets[wallet.address] = wallet;
+    return wallet.address;
+  }
+
+  get addresses() {
+    let addresses = [];
+    for (let addr in this.wallets) {
+      addresses.push(addr);
+    }
+    return addresses;
+  }
+
+  getWallet(addr) {
+    return this.wallets[addr];
+  }
+
+  save() {
+    let data = this.toString();
+
+    this.store.set("wallets", data);
+  }
+
+  toString() {
+    let data = {};
+    for (let addr in this.wallets) {
+      let w = this.wallets[addr];
+      data[addr] = w.toString();
+    }
+    data = JSON.stringify(data);
+    return data;
+  }
+}
+
+```
+
+总结如下：
+
+1. ```constructor``` 生成一个Object以及对应的本地文件连接，该连接用于读取或者修改数据
+2. ```newWallets``` 该函数用于读取本地钱包文件，如果不存在，则生成新的钱包文件
+3. ```createWallet``` 该函数生成一个新的地址
+4. ```getWallet``` 根据地址，获取到对应的wallet实例
+
+
+将一个公钥转换成一个 Base58 地址需要以下步骤：
+
+1. 使用 `RIPEMD160(SHA256(PubKey))` 哈希算法，取公钥并对其哈希两次
+
+2. 给哈希加上地址生成算法版本的前缀
+
+3. 对于第二步生成的结果，使用 `SHA256(SHA256(payload))` 再哈希，计算校验和。校验和是结果哈希的前四个字节。
+
+4. 将校验和附加到 `version+PubKeyHash` 的组合中。
+
+5. 使用 Base58 对 `version+PubKeyHash+checksum` 组合进行编码。
+
+至此，就可以得到一个**真实的比特币地址**，你甚至可以在 [blockchain.info](https://blockchain.info/) 查看它的余额。不过我可以负责任地说，无论生成一个新的地址多少次，检查它的余额都是 0。这就是为什么选择一个合适的公钥加密算法是如此重要：考虑到私钥是随机数，生成同一个数字的概率必须是尽可能地低。理想情况下，必须是低到“永远”不会重复。
+
+另外，注意：你并不需要连接到一个比特币节点来获得一个地址。地址生成算法使用的多种开源算法可以通过很多编程语言和库实现。
+
+现在我们需要修改输入和输出来使用地址：
+
+```JavaScript
+
+//TXInput in Transaction.js
+
+class TXInput {
+  constructor(txId, vOut, signature, pubKey) {
+    // change in PART5
+    this.txId = txId; // 一个交易输入引用了之前一笔交易的一个输出, ID 表明是之前哪笔交易
+    this.vOut = vOut; // 一笔交易可能有多个输出，Vout 为输出的索引
+    // this.scriptSig = scriptSig;
+    // add in PART5
+    this.signature = signature; //signature是一个Buffer
+    this.pubKey = pubKey; //pubKey是一个Buffer
+  }
+
+  // remove in PART5
+  // unlockingData 理解为地址
+  // canUnlockOutputWith(unlockingData) {
+  //   return this.scriptSig == unlockingData;  
+  // }
+
+  usersKey(pubKeyHash) {
+    let pkHash = ECKey.hashPubKey(this.pubKey);
+    if (pubKeyHash.toString('hex') === pkHash.toString('hex'))
+      return true;
+    return false;
+  }
+
+  // 其中有2个地方把buffer转化为hex的string，为了本地保存，以及读取之后可以还原回来
+  toJSON() {
+    return {
+      txId: this.txId,
+      vOut: this.vOut,
+      signature: this.signature ? this.signature.toString('hex') : "",
+      pubKey: this.pubKey ? this.pubKey.toString('hex') : ""
+    }
+  }
+}
+
+```
+
+注意，现在我们已经不再需要 `ScriptPubKey` 和 `ScriptSig` 字段，因为我们不会实现一个脚本语言。相反，`ScriptSig` 会被分为 `Signature` 和 `PubKey` 字段，`ScriptPubKey` 被重命名为 `PubKeyHash`。我们会实现跟比特币里一样的输出锁定/解锁和输入签名逻辑，不同的是我们会通过方法（method）来实现。
+
+`UsesKey` 方法检查输入使用了指定密钥来解锁一个输出。注意到输入存储的是原生的公钥（也就是没有被哈希的公钥），但是这个函数要求的是哈希后的公钥。`IsLockedWithKey` 检查是否提供的公钥哈希被用于锁定输出。这是一个 `UsesKey` 的辅助函数，并且它们都被用于 `FindUnspentTransactions` 来形成交易之间的联系。
+
+`Lock` 只是简单地锁定了一个输出。当我们给某个人发送币时，我们只知道他的地址，因为这个函数使用一个地址作为唯一的参数。然后，地址会被解码，从中提取出公钥哈希并保存在 `PubKeyHash` 字段。
+
+
+相对应的TXOutput也得做修改：
+
+```JavaScript
+
+class TXOutput {
+  constructor(value, pubKeyHash) {
+    // change in PART5
+    this.value = parseInt(value);
+    // this.scriptPubKey = scriptPubKey;
+    this.pubKeyHash = pubKeyHash; // 注意，这里是pubKeyHash，不同于TXInput的pubKey
+  }
+
+  canBeUnlockedWith(unlockingData) {
+    return this.scriptPubKey == unlockingData;
+  }
+
+  static newTXOutput(value, toAddress) {
+    let output = new TXOutput(value, null);
+    output.lock(toAddress);
+    return output;
+  }
+
+  lock(address) {
+    let pubkeyHash = Base58Check.decode(address, Wallets.getDefaultVersioin().public);
+    this.pubKeyHash = pubkeyHash;
+  }
+
+  isLockedWithKey(pubkeyHash) {
+    if (pubkeyHash.toString('hex') === this.pubKeyHash.toString('hex'))
+      return true;
+    return false;
+  }
+
+  toJSON() {
+    return {
+      value: this.value,
+      pubKeyHash: this.pubKeyHash ? this.pubKeyHash.toString('hex') : ""
+    }
+  }
+}
+
+```
+
+## 实现签名
+
+交易必须被签名，因为这是比特币里面保证发送方不会花费属于其他人的币的唯一方式。如果一个签名是无效的，那么这笔交易就会被认为是无效的，因此，这笔交易也就无法被加到区块链中。
+
+我们现在离实现交易签名还差一件事情：用于签名的数据。一笔交易的哪些部分需要签名？又或者说，要对完整的交易进行签名？选择签名的数据相当重要。因为用于签名的这个数据，必须要包含能够唯一识别数据的信息。比如，如果仅仅对输出值进行签名并没有什么意义，因为签名不会考虑发送方和接收方。
+
+考虑到交易解锁的是之前的输出，然后重新分配里面的价值，并锁定新的输出，那么必须要签名以下数据：
+
+1. 存储在已解锁输出的公钥哈希。它识别了一笔交易的“发送方”。
+
+2. 存储在新的锁定输出里面的公钥哈希。它识别了一笔交易的“接收方”。
+
+3. 新的输出值。
+
+>在比特币中，锁定/解锁逻辑被存储在脚本中，它们被分别存储在输入和输出的 `ScriptSig` 和 `ScriptPubKey` 字段。由于比特币允许这样不同类型的脚本，它对 `ScriptPubKey` 的整个内容进行了签名。
+
+可以看到，我们不需要对存储在输入里面的公钥签名。因此，在比特币里， 所签名的并不是一个交易，而是一个去除部分内容的输入副本，输入里面存储了被引用输出的 `ScriptPubKey` 。
+
+>获取修剪后的交易副本的详细过程在[这里](https://en.bitcoin.it/wiki/File:Bitcoin_OpCheckSig_InDetail.png). 虽然它可能已经过时了，但是我并没有找到另一个更可靠的来源。
+
+看着有点复杂，来开始写代码吧。先从 `Sign` 方法开始：
+
+```JavaScript
+
+//transaction.js
+
+  // 可以理解为 copy 整个transaction
+  // 因为在sign和verify过程中，需要对数据进行修改。但是我们不希望真正的修改数据，只是为了提取出来使用
+  trimmedCopy() {
+    let inputs = [];
+    let outputs = [];
+
+    for (let i in this.vIn) {
+      let input = new TXInput(this.vIn[i].txId, this.vIn[i].vOut, null, null);
+      inputs.push(input);
+    }
+
+    for (let o in this.vOut) {
+      let output = new TXOutput(this.vOut[o].value, this.vOut[o].pubKeyHash);
+      outputs.push(output);
+    }
+
+    let newTransaction = new Transaction();
+    newTransaction.id = this.id;
+    newTransaction.vIn = inputs;
+    newTransaction.vOut = outputs;
+    return newTransaction;
+  }
+
+  // Sign signs each input of a Transaction
+  sign(walletPrivateKey, prevTXs) {
+
+    // coinbase没有输入源，所以不需要签名
+    if (this.isCoinbase())
+      return;
+
+    // 确认输入是正确的，TXInput都有对应的源头
+    for (let i in this.vIn) {
+      let txId = this.vIn[i].txId;
+      if (!prevTXs[txId])
+        throw new Error(`cannot find txId( ${txId} ) in prevTXs`);
+    }
+
+    let txCopy = this.trimmedCopy();
+
+    // 取出每个TXInput，进行hash，最终用对应的privateKey进行签名保存
+    for (let i in txCopy.vIn) {
+      let vIn = txCopy.vIn[i];
+      let txId = vIn.txId;
+      let prevTx = prevTXs[txId];
+      txCopy.vIn[i].signature = null;
+      txCopy.vIn[i].pubKey = prevTx.vOut[vIn.vOut].pubKeyHash;
+      txCopy.id = Transaction.hashTransaction(txCopy);
+      txCopy.vIn[i].pubKey = null;  //`Hash` 方法对交易进行序列化，并使用 SHA-256 算法进行哈希。哈希后的结果就是我们要签名的数据。在获取完哈希，我们应该重置 `PubKey` 字段，以便于它不会影响后面的迭代。
+
+
+      let signatureBuf = secp256k1.sign(Buffer.from(txCopy.id, 'hex'), walletPrivateKey); //我们通过 `privKey` 对 `txCopy.ID` 进行签名。一个 ECDSA 签名就是一对数字，我们对这对数字连接起来，并存储在输入的 `Signature` 字段。
+      this.vIn[i].signature = signatureBuf.signature;
+    }
+  }
+
+
+```
+
+在每个输入中，`Signature` 被设置为 `nil` (仅仅是一个双重检验)，`PubKey` 被设置为所引用输出的 `PubKeyHash`。现在，除了当前交易，其他所有交易都是“空的”，也就是说他们的 `Signature` 和 `PubKey` 字段被设置为 `nil`。因此，**输入是被分开签名的**，尽管这对于我们的应用并不十分紧要，但是比特币允许交易包含引用了不同地址的输入。
+
+现在，验证函数：
+
+```JavaScript
+
+  verify(prevTXs) {
+    if (this.isCoinbase())
+      return;
+
+    for (let i in this.vIn) {
+      let txId = this.vIn[i].txId;
+      if (!prevTXs[txId].id)
+        throw new Error(`ERROR: Previous transaction is not correct`);
+    }
+
+    let txCopy = this.trimmedCopy();
+
+    for (let i in this.vIn) {
+      let vIn = this.vIn[i];
+      let txId = vIn.txId;
+      let prevTx = prevTXs[txId];
+
+      txCopy.vIn[i].signature = null;
+      txCopy.vIn[i].pubKey = prevTx.vOut[vIn.vOut].pubKeyHash;
+      txCopy.id = Transaction.hashTransaction(txCopy);
+      txCopy.vIn[i].pubKey = null;
+
+      let pubKey = vIn.pubKey;
+      console.log(vIn)
+      let verifyResult = secp256k1.verify(Buffer.from(txCopy.id, 'hex'), vIn.signature, vIn.pubKey);
+      if (!verifyResult)
+        return false;
+    }
+    return true;
+  }
+
+```
+
+签名验证部分暂时结束了，现在，我们需要一个函数来获得之前的交易。由于这需要与区块链进行交互，我们将它放在了 `Blockchain` 的方法里面：
+
+```JavaScript
+
+  //blockchain.js
+
+  // 根据id，依次查询所有block里面的transaction
+  findTransaction(id) {
+    let iterator = this.getBlockIterator();
+    while(iterator.hasNext()) {
+      let prev = iterator.next();
+      for (let i in prev.transactions) {
+        let tx = prev.transactions[i];
+        if (tx.id === id) {
+          return tx;
+        }
+      }
+    }
+    return null;
+  }
+
+  signTransaction(transaction, walletPrivateKey) {
+    let prevTXs = {};
+    for (let i in transaction.vIn) {
+      let prevTX = this.findTransaction(transaction.vIn[i].txId);
+      prevTXs[prevTX.id] = prevTX;
+    }
+    transaction.sign(walletPrivateKey, prevTXs);
+  }
+
+  verifyTransaction(transaction) {
+    let prevTXs = {};
+    for (let i in transaction.vIn) {
+      let prevTX = this.findTransaction(transaction.vIn[i].txId);
+      prevTXs[prevTX.id] = prevTX;
+    }
+    return transaction.verify(prevTXs);
+  }
+
+```
+
+这几个比较简单：`FindTransaction` 通过 ID 找到一笔交易（这需要在区块链上迭代所有区块）；`SignTransaction` 传入一笔交易，找到它引用的交易，然后对它进行签名；`VerifyTransaction` 做的是相同的事情，不过是对交易进行验证。
+
+现在，我们需要实际签名和验证交易。签名在 `NewUTXOTransaction` 中进行：
+
+```JavaScript
+
+  static NewUTXOTransaction(fromAddr, to, amount, bc) {
+    let inputs = [];
+    let outputs = [];
+
+    // add in PART5
+    // 获取钱包文件，接着获取对应的人的具体钱包
+    let wallets = Wallets.newWallets(); // return wallets instance, not really new wallets
+    let fromWallet = wallets.getWallet(fromAddr);
+    let pubKeyHash = fromWallet.pubKeyHash;
+
+    let obj = bc.findSpendableOutputs(pubKeyHash, amount);
+    let acc = obj.amount;
+    let unspentOutputs = obj.unspentOutputs;
+
+    if (acc < amount) {
+      console.log(`ERROR: Not enough funds`);
+      return;
+    }
+
+    for (let txId in unspentOutputs) {
+      let outs = unspentOutputs[txId];
+      for (let key in outs) {
+        let outIdx = outs[key];
+        let input = new TXInput(txId, outIdx, null, fromWallet.publicKey);  // 这个地方不做签名处理。
+        inputs.push(input);
+      }
+    }
+
+    outputs.push(TXOutput.newTXOutput(amount, to));
+
+    if (acc > amount) {
+      outputs.push(TXOutput.newTXOutput(acc - amount, fromAddr));
+    }
+
+    let tx = new Transaction();
+    tx.vIn = inputs;
+    tx.vOut = outputs;
+    tx.setId();
+    bc.signTransaction(tx, fromWallet.privateKey);  //做具体签名处理
+
+    return tx;
+  }
+
+```
+
+在一笔交易被放入一个块之前进行验证：
+
+```JavaScript
+
+  // 每个transaction都必须经过验证
+  mineBlock(txs) {
+    for (let i in txs) {
+      let tx = txs[i];
+      if (!this.verifyTransaction(tx)) {
+        throw new Error('transaction verify failed');
+      }
+    }
+
+    let lastHash = this.db.get('l');
+    let newBlock = Block.NewBlock(txs, lastHash);
+    this.db.set(newBlock.hash, newBlock.toString());
+    this.db.set('l', newBlock.hash);
+    this.tip = newBlock.hash;
+  }
+
+```
+
+其他的一些细节的修改，比如 cli.js 里面 很多函数的传入是address，修改为pubKey。具体可查看代码。
+
+现在开始做一些验证：
+
+```shell
+
+$ node src/cli.js createwallet
+Your new address: 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm
+
+$ node src/cli.js createwallet
+Your new address: 18XukoX4jhiERbkJyiW9dCvRi4KahfZR9Z
+
+$ node src/cli.js addblockchain -s 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm
+Mining the block: [object Object]
+Mining end! hash: 005f9c400e3e4b9262218e73a90e13110f77be8e882be1ba4f4afa665f2286c0
+{"timestamp":1535860061599,"prevBlockHash":"","hash":"005f9c400e3e4b9262218e73a90e13110f77be8e882be1ba4f4afa665f2286c0","nonce":0,"transactions":[{"id":"80179d03cd19706d62e95c3c2e5b9c39a6fddedcc87d924c7762c62a531cf1cb","vIn":[{"txId":0,"vOut":-1,"signature":"","pubKey":"5468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73"}],"vOut":[{"value":10,"pubKeyHash":"3c35cec216020d51e4ec50e9149c701842ca7c4b"}]}]}
+
+$ node src/cli.js getBalance --address 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm
+Balance of 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm: 10
+
+$ node src/cli.js getBalance --address 18XukoX4jhiERbkJyiW9dCvRi4KahfZR9Z
+Balance of 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm: 0
+
+$ node src/cli.js send -s 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm -t 18XukoX4jhiERbkJyiW9dCvRi4KahfZR9Z -v 3
+TXInput {
+  txId: '80179d03cd19706d62e95c3c2e5b9c39a6fddedcc87d924c7762c62a531cf1cb',
+  vOut: 0,
+  signature: <Buffer 68 77 fc 3c 12 64 f0 32 68 66 cd cc 34 54 ec 8d 0a 9d 35 9f ac f5 e6 6d e4 7d 24 08 61 0d f4 ad 77 53 da 7d b0 31 90 8d 35 62 6b b3 ae de 1c 3b 1d 0e ... >,
+  pubKey: <Buffer 03 29 8c 09 48 93 29 ba 20 6e 27 36 c0 ba bd 0b e5 6a 48 0f 85 29 28 b7 d6 ec bb b3 39 07 4d 83 a3> }
+Mining the block: [object Object]
+Mining end! hash: 00865ffa288606fc5cd7fd0d64e3caf018c1e4a316cf4916774933f7ff6335ec
+Success!
+
+$ node src/cli.js getBalance --address 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm
+Balance of 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm: 7
+
+$ node src/cli.js getBalance --address 18XukoX4jhiERbkJyiW9dCvRi4KahfZR9Z
+Balance of 16VN18b5ohVyutFniT2X76DaCmwtLNBvEm: 3
+```
+
