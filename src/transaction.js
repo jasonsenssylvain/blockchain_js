@@ -267,6 +267,11 @@ class TXOutput {
       pubKeyHash: this.pubKeyHash ? this.pubKeyHash.toString('hex') : ""
     }
   }
+
+  static fromJSON(data) {
+    let txOutput = new TXOutput(data.value, Buffer.from(data.pubKeyHash, 'hex'));
+    return txOutput;
+  }
 }
 
 class TXInput {

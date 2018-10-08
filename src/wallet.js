@@ -13,6 +13,7 @@ class Wallets {
   constructor() {
     this.wallets = {};  // key: address, value: wallet
     let store = new InCache({
+      filePath: "wallets.json",
       storeName: "wallets",
       autoSave: true,
       autoSaveMode: "timer",

@@ -97,8 +97,9 @@ class BlockChain {
   }
 
   // in PART5: change address to pubKeyHash
-  findUnspentTransactions(pubKeyHash) {
-    let unspentTXs = [];
+  // change to findUTXO in part6
+  findUTXO() {
+    let UTXO = {};  // 原本是array，修改为 map[] 
 
     let spentTXOs = {};
 
@@ -130,24 +131,42 @@ class BlockChain {
             continue;
           }
 
-          let out = tx.vOut[outIdx];
-          // change in PART5
-          if (out.isLockedWithKey(pubKeyHash)) {
-            unspentTXs.push(tx);
-          }
+          // add in part6
+          if (UTXO[txId] == null || UTXO[txId] == undefined)
+            UTXO[txId] = [];
+          let output = tx.vOut[outIdx];
+          UTXO[txId].push(output);
+
+
+          // remove in part6
+          // let out = tx.vOut[outIdx];
+          // // change in PART5
+          // if (out.isLockedWithKey(pubKeyHash)) {
+          //   unspentTXs.push(tx);
+          // }
         }
 
         if (tx.isCoinbase() == false) {
           for (let k = 0; k < tx.vIn.length; k ++) {
             let vIn = tx.vIn[k];
-            // change in PART5
-            if (vIn.usersKey(pubKeyHash)) {
-              let vInId = vIn.txId;
-              if (!spentTXOs[vInId]) {
-                spentTXOs[vInId] = [];
-              }
-              spentTXOs[vInId].push(vIn.vOut);
+
+            let inTxId = vIn.txId;
+            if (spentTXOs[inTxId] == null || spentTXOs[inTxId] == undefined)
+              spentTXOs[inTxId] = [];
+
+            for (let n in vIn.vOut) {
+              let out = vIn.vOut[n];
+              spentTXOs[inTxId].spend(out);
             }
+
+            // change in PART5
+            // if (vIn.usersKey(pubKeyHash)) {
+            //   let vInId = vIn.txId;
+            //   if (!spentTXOs[vInId]) {
+            //     spentTXOs[vInId] = [];
+            //   }
+            //   spentTXOs[vInId].push(vIn.vOut);
+            // }
           }
         }
       }
@@ -156,20 +175,21 @@ class BlockChain {
     return unspentTXs;
   }
 
+  // remove in PART6
   // change IN PART5
-  findUTXO(pubKeyHash) {
-    let UTXOs = [];
-    let txs = this.findUnspentTransactions(pubKeyHash);
+  // findUTXO(pubKeyHash) {
+  //   let UTXOs = [];
+  //   let txs = this.findUnspentTransactions(pubKeyHash);
 
-    for (let i = 0; i < txs.length; i ++) {
-      for (let j = 0; j < txs[i].vOut.length; j ++) {
-        if (txs[i].vOut[j].isLockedWithKey(pubKeyHash)) {
-          UTXOs.push(txs[i].vOut[j]);
-        }
-      }
-    }
-    return UTXOs;
-  }
+  //   for (let i = 0; i < txs.length; i ++) {
+  //     for (let j = 0; j < txs[i].vOut.length; j ++) {
+  //       if (txs[i].vOut[j].isLockedWithKey(pubKeyHash)) {
+  //         UTXOs.push(txs[i].vOut[j]);
+  //       }
+  //     }
+  //   }
+  //   return UTXOs;
+  // }
 
   findSpendableOutputs(pubKeyHash, amount) {
     let unspentOutputs = {};
